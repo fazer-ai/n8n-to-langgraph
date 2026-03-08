@@ -112,11 +112,14 @@ Otherwise, run the Analysis + Planning pipeline:
    - All credentials/env vars needed
    - All system prompts extracted verbatim
    - Data flow between workflows
-4. Help the user set up credentials directly:
-   - Create .env file with all needed variables
-   - Test connections where possible (e.g. curl Chatwoot API)
-   - Don't just list instructions — do the work
-5. Present analysis summary
+4. Present analysis summary to user
+5. **CREDENTIAL SETUP (MANDATORY GATE — do not proceed to Phase 2 without this)**:
+   - Create .env file with all needed variables (placeholders for values)
+   - Ask user to fill in the actual credentials
+   - Test connections where possible (e.g. curl Chatwoot API with provided token)
+   - Do not proceed until user confirms credentials are set up
+   - If user wants to skip, acknowledge that manual testing won't be
+     possible until credentials are configured later
 
 ### PHASE 2: ARCHITECTURE & PLANNING
 
@@ -135,7 +138,7 @@ Otherwise, run the Analysis + Planning pipeline:
    - Milestone-based test plan
    - Implementation order as phased checklist
    - Graph visualization script spec (visualize-graphs.ts)
-4. Present plan summary to user for review
+3. Present plan summary to user for review
 
 ### RALPH-LOOP HANDOFF
 
