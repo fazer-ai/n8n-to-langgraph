@@ -9,6 +9,7 @@ skills:
   - langgraph-persistence
   - langchain-dependencies
   - n8n-to-langgraph:n8n-to-langgraph
+  - n8n-mcp-skills:n8n-workflow-patterns
 ---
 
 You are a senior software architect specializing in converting n8n workflows

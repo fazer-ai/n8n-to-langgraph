@@ -120,17 +120,14 @@ Otherwise, run the Analysis + Planning pipeline:
 
 ### PHASE 2: ARCHITECTURE & PLANNING
 
-1. Invoke relevant integration skills in the main conversation:
-   - If Chatwoot detected: invoke `chatwoot-skills:chatwoot-automation-patterns`
-   - If other integrations: invoke their respective skills
-   (The conversion-architect agent already has langgraph + conversion
-   skills preloaded, but integration-specific skills should be invoked
-   here so the main conversation also has the context)
-2. Launch `conversion-architect` agent with:
+1. Launch `conversion-architect` agent with:
    - Full consolidated analysis from Phase 1
    - List of credentials available in .env
    - User's language preference
-3. Architect produces the conversion plan including:
+   - List of detected integrations (e.g. Chatwoot, Google Calendar, etc.)
+     and their corresponding skills to invoke during architecture design
+     (e.g. "If you need Chatwoot patterns, invoke chatwoot-skills:chatwoot-automation-patterns")
+2. Architect produces the conversion plan including:
    - Architecture overview
    - State schemas, node/edge definitions, tool specs
    - System prompts: ORIGINAL + PROPOSED ADAPTATION + DIFF
