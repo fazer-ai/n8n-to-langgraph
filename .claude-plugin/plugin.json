@@ -1,0 +1,5 @@
+{
+  "name": "n8n-to-langgraph",
+  "description": "Convert n8n workflows to LangGraph TypeScript applications",
+  "author": { "name": "fazer.ai" }
+}
