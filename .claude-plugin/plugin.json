@@ -1,5 +1,12 @@
 {
   "name": "n8n-to-langgraph",
+  "version": "1.0.0",
   "description": "Convert n8n workflows to LangGraph TypeScript applications",
-  "author": { "name": "fazer.ai" }
+  "author": {
+    "name": "fazer.ai",
+    "url": "https://fazer.ai"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/fazer-ai/n8n-to-langgraph",
+  "homepage": "https://github.com/fazer-ai/n8n-to-langgraph"
 }

@@ -1,9 +1,17 @@
 {
   "name": "n8n-to-langgraph",
   "description": "Convert n8n workflows to LangGraph TypeScript applications",
-  "plugins": [{
-    "name": "n8n-to-langgraph",
-    "source": "./",
-    "description": "3 subagents + 1 skill for converting n8n workflows to LangGraph apps"
-  }]
+  "owner": {
+    "name": "fazer.ai",
+    "url": "https://fazer.ai"
+  },
+  "plugins": [
+    {
+      "name": "n8n-to-langgraph",
+      "source": "./",
+      "description": "3 subagents + 1 skill for converting n8n workflows to LangGraph apps",
+      "version": "1.0.0",
+      "category": "development"
+    }
+  ]
 }
