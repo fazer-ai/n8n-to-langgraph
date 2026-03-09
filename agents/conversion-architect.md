@@ -89,6 +89,9 @@ all rules the implementer must follow. This section is what the ralph-loop
 prompt will reference, so it must be self-contained. Include:
 - Install packages via `bun add <pkg>` — NEVER edit package.json manually
 - Use the user's language in code (variable names, tool names, function names)
+- Use camelCase for variables, functions, and methods — snake_case is only for
+  graph node names and state annotation keys (e.g., node "verificar_lock" but
+  function verificarLock(), variable mensagensColetadas)
 - Invoke relevant skills when working on specific areas:
   /langgraph-fundamentals, /langgraph-persistence, /chatwoot-skills:*, etc.
 - Implement the PROPOSED ADAPTATIONS for system prompts (not the raw originals)
@@ -100,4 +103,5 @@ prompt will reference, so it must be self-contained. Include:
 CRITICAL RULES:
 - Package installation MUST use `bun add <pkg>`, NEVER manual package.json edits
 - Use the user's language for naming in code
+- camelCase for variables/functions/methods, snake_case ONLY for graph node names
 - Graph visualization: use LangGraph's getGraph().drawMermaidPng() pattern
