@@ -104,4 +104,6 @@ CRITICAL RULES:
 - Package installation MUST use `bun add <pkg>`, NEVER manual package.json edits
 - Use the user's language for naming in code
 - camelCase for variables/functions/methods, snake_case ONLY for graph node names
+- Timezones MUST be configurable via environment variable (e.g. TZ or APP_TIMEZONE),
+  never hardcoded in code. All date/time operations should use the configured timezone.
 - Graph visualization: use LangGraph's getGraph().drawMermaidPng() pattern
