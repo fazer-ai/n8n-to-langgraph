@@ -25,6 +25,7 @@ argument-hint: "<workflows-dir> [review]"
 | Execution data | State schema (Annotation) |
 | Wait node | sleep() in graph node |
 | Error trigger | try/catch + conditional edge |
+| — (no n8n equivalent) | Langfuse observability (CallbackHandler) |
 
 ### Prompt Extraction
 
@@ -60,6 +61,100 @@ function createTools(context: { telefone: string; conversationId: number }) {
   ];
 }
 ```
+
+### Langfuse Observability (Default)
+
+All converted LangGraph applications MUST include Langfuse integration by default
+for tracing, token usage, latency, and cost monitoring.
+
+**Packages**: `langfuse` + `langfuse-langchain`
+
+**Environment variables** (add to .env alongside other credentials):
+```env
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_BASEURL=https://cloud.langfuse.com
+```
+
+**Helper module** — create `src/lib/langfuse.ts` (or equivalent path):
+
+```typescript
+import { CallbackHandler } from "langfuse-langchain";
+
+const langfuseActive =
+  !!process.env.LANGFUSE_SECRET_KEY && !!process.env.LANGFUSE_PUBLIC_KEY;
+
+export function createLangfuseHandler(
+  traceName: string,
+  opts: {
+    sessionId?: string;
+    userId?: string;
+    metadata?: Record<string, unknown>;
+    tags?: string[];
+  } = {},
+): CallbackHandler | undefined {
+  if (!langfuseActive) return undefined;
+
+  return new CallbackHandler({
+    secretKey: process.env.LANGFUSE_SECRET_KEY!,
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
+    baseUrl: process.env.LANGFUSE_BASEURL ?? "https://cloud.langfuse.com",
+    sessionId: opts.sessionId,
+    userId: opts.userId,
+    metadata: { ...opts.metadata, traceName },
+    tags: opts.tags,
+  });
+}
+
+export async function flushLangfuseHandler(
+  handler: CallbackHandler | undefined,
+): Promise<void> {
+  if (handler) {
+    await handler.shutdownAsync();
+  }
+}
+```
+
+Design principles:
+- **Opt-in via env vars**: returns `undefined` when keys are missing — zero overhead in dev/test
+- **One handler per trace**: each request/invocation gets its own handler so traces don't mix
+- **`traceName` in metadata**: stored in metadata for dashboard filtering
+- **Always call `shutdownAsync()`**: use try/finally to guarantee buffered events are flushed
+
+**Usage in graph/agent invocations**:
+
+```typescript
+// For compiled graph.invoke()
+const langfuseHandler = createLangfuseHandler("my-graph", {
+  sessionId: threadId,
+});
+try {
+  const result = await graph.invoke(initialState, {
+    configurable: { thread_id: threadId },
+    callbacks: langfuseHandler ? [langfuseHandler] : undefined,
+  });
+} finally {
+  await flushLangfuseHandler(langfuseHandler);
+}
+
+// For createReactAgent .invoke()
+const langfuseHandler = createLangfuseHandler("react-agent", {
+  sessionId: conversationId,
+  userId: userId,
+});
+try {
+  const result = await agent.invoke(
+    { messages },
+    langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
+  );
+} finally {
+  await flushLangfuseHandler(langfuseHandler);
+}
+```
+
+Callback propagation is automatic — passing callbacks to `graph.invoke()` or
+`agent.invoke()` propagates to all nested LLM calls, tool calls, and sub-chains.
+No changes needed in tools or prompts.
 
 ### Testing Strategy
 
@@ -115,6 +210,7 @@ Otherwise, run the Analysis + Planning pipeline:
 4. Present analysis summary to user
 5. **CREDENTIAL SETUP (MANDATORY GATE — do not proceed to Phase 2 without this)**:
    - Create .env file with all needed variables (placeholders for values)
+   - Include LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_BASEURL in .env
    - Ask user to fill in the actual credentials
    - Test connections where possible (e.g. curl Chatwoot API with provided token)
    - Do not proceed until user confirms credentials are set up
@@ -127,14 +223,18 @@ Otherwise, run the Analysis + Planning pipeline:
    - Full consolidated analysis from Phase 1
    - List of credentials available in .env
    - User's language preference
+   - Instruction to include Langfuse observability module (`src/lib/langfuse.ts`)
+     and wire it into all graph/agent `.invoke()` calls
    - List of detected integrations (e.g. Chatwoot, Google Calendar, etc.)
      and their corresponding skills to invoke during architecture design
      (e.g. "If you need Chatwoot patterns, invoke chatwoot-skills:chatwoot-automation-patterns")
 2. Architect produces the conversion plan including:
    - Architecture overview
    - State schemas, node/edge definitions, tool specs
+   - Langfuse helper module spec (`src/lib/langfuse.ts`) and wiring into all invoke calls
    - System prompts: ORIGINAL + PROPOSED ADAPTATION + DIFF
    - Package list (exact names for `bun add` — NEVER manual package.json)
+     — must include `langfuse` and `langfuse-langchain`
    - Milestone-based test plan
    - Implementation order as phased checklist
    - Graph visualization script spec (visualize-graphs.ts)
@@ -166,7 +266,7 @@ When `$ARGUMENTS` contains "review":
 1. Launch 2-3 `conversion-reviewer` agents in parallel:
    - Agent A focus: Prompt fidelity + logic completeness
    - Agent B focus: Test coverage + code quality
-   - Agent C focus: Integration correctness + error handling
+   - Agent C focus: Integration correctness + error handling + Langfuse wiring
    (All reviewers have langgraph + n8n + conversion skills preloaded)
 2. Consolidate findings
 3. Present review report:

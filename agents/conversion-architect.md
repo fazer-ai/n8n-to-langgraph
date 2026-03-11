@@ -27,11 +27,14 @@ Core Responsibilities:
 3. Design state schemas (LangGraph Annotations) preserving all data flow
 4. Plan outer graph (orchestration) vs inner agent (LLM reasoning) split
 5. Specify checkpointer strategy and thread_id patterns
-6. Create test plan (tests after each implementation milestone)
-7. Design graph visualization script (using getGraph().drawMermaidPng())
-8. Specify exact packages to install (for `bun add` — NEVER edit package.json)
-9. Plan implementation order as a phased checklist
-10. For each AI prompt: include ORIGINAL verbatim AND PROPOSED adaptation
+6. Design Langfuse observability module (`src/lib/langfuse.ts`) and wire
+   it into all graph/agent `.invoke()` calls via callbacks
+7. Create test plan (tests after each implementation milestone)
+8. Design graph visualization script (using getGraph().drawMermaidPng())
+9. Specify exact packages to install (for `bun add` — NEVER edit package.json)
+   — must include `langfuse` and `langfuse-langchain`
+10. Plan implementation order as a phased checklist
+11. For each AI prompt: include ORIGINAL verbatim AND PROPOSED adaptation
     with a clear diff showing what changed and why
 
 Architecture Process:
@@ -55,14 +58,21 @@ Architecture Process:
    a. Routes matching n8n webhook triggers
    b. Request validation
    c. Async processing pattern
-6. Test plan (milestone-based):
+6. Langfuse observability:
+   a. Helper module (`src/lib/langfuse.ts`) with createLangfuseHandler/flushLangfuseHandler
+   b. Wire handler into every graph.invoke() and agent.invoke() via callbacks
+   c. Use try/finally with shutdownAsync() for guaranteed flush
+   d. One handler per trace — never reuse across invocations
+   e. Pass sessionId (thread/conversation ID) and userId where available
+   f. Add LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_BASEURL to env vars map
+7. Test plan (milestone-based):
    - Milestone 1 (foundation): env validation, DB setup tests
    - Milestone 2 (services): API client tests with mocks
    - Milestone 3 (tools): each tool tested with mock services
    - Milestone 4 (graphs): graph routing tests with mock LLM
    - Milestone 5 (routes): webhook handler tests
    - Manual test scripts using real credentials
-7. For each system prompt:
+8. For each system prompt:
    a. Include the ORIGINAL verbatim text from workflow analysis
    b. Include a PROPOSED adaptation for LangGraph context
    c. Include a clear diff showing what changed and why
@@ -76,9 +86,11 @@ Provide the conversion plan with:
 - State schemas (TypeScript types)
 - Node definitions (name, logic summary, routing)
 - Tool specifications (name, description, schema, logic)
+- Langfuse observability module spec (`src/lib/langfuse.ts`) and wiring plan
+  showing where callbacks are passed for each graph/agent invocation
 - System prompts: ORIGINAL + PROPOSED ADAPTATION + DIFF for each
-- Package list (exact names for `bun add`)
-- Environment variables map
+- Package list (exact names for `bun add`) — must include `langfuse` and `langfuse-langchain`
+- Environment variables map (including LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_BASEURL)
 - Test plan (milestone-based)
 - Implementation order as phased checklist with checkboxes
 - Graph visualization script spec (visualize-graphs.ts using drawMermaidPng())
@@ -99,6 +111,10 @@ prompt will reference, so it must be self-contained. Include:
 - Commit progress after each milestone
 - After implementing each integration, test it manually with real credentials
 - Create/update visualize-graphs.ts and run it to generate graph PNGs
+- Implement the Langfuse helper module (`src/lib/langfuse.ts`) early in foundation phase
+- Wire Langfuse handler into ALL graph.invoke() and agent.invoke() calls using
+  try/finally + shutdownAsync() pattern
+- Packages `langfuse` and `langfuse-langchain` MUST be in the `bun add` list
 
 CRITICAL RULES:
 - Package installation MUST use `bun add <pkg>`, NEVER manual package.json edits
@@ -107,3 +123,5 @@ CRITICAL RULES:
 - Timezones MUST be configurable via environment variable (e.g. TZ or APP_TIMEZONE),
   never hardcoded in code. All date/time operations should use the configured timezone.
 - Graph visualization: use LangGraph's getGraph().drawMermaidPng() pattern
+- Langfuse: all graph/agent invocations must use createLangfuseHandler with
+  try/finally + flushLangfuseHandler. One handler per trace, never reuse.

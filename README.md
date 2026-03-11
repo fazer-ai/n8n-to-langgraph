@@ -4,7 +4,9 @@ A Claude Code marketplace plugin that converts n8n workflows to LangGraph TypeSc
 
 ## What it does
 
-This plugin provides a structured pipeline for converting n8n workflow JSON files into fully functional LangGraph applications. It handles the full lifecycle: analysis, architecture planning, implementation guidance, and post-implementation review.
+This plugin provides a structured pipeline for converting n8n workflow JSON files into fully functional LangGraph applications with **Langfuse observability built in by default**. It handles the full lifecycle: analysis, architecture planning, implementation guidance, and post-implementation review.
+
+Every converted application includes a Langfuse helper module that traces all LLM calls, tool invocations, and graph executions — giving you a dashboard with latency, token usage, costs, and session replay. The integration is opt-in via environment variables: zero overhead when keys are not set.
 
 ## Architecture
 
@@ -101,6 +103,7 @@ Launches parallel reviewers that compare the implementation against the original
 | IF/Switch node | Conditional edges |
 | Credentials | Environment variables (.env) |
 | Execution data | State schema (Annotation) |
+| — (no n8n equivalent) | Langfuse observability (CallbackHandler) |
 
 ## Dependencies
 
@@ -111,6 +114,18 @@ This plugin works best with these companion plugins:
 - [ralph-loop](https://github.com/anthropics/claude-plugins-official) — Autonomous implementation loop
 
 LangGraph skills (`langgraph-fundamentals`, `langgraph-persistence`, `langchain-dependencies`) are expected to be available in your Claude Code environment.
+
+### Langfuse
+
+Converted applications integrate with [Langfuse](https://langfuse.com) for observability. The generated code includes a helper module and wires it into all graph/agent invocations. Users need to provide their Langfuse API keys in `.env`:
+
+```env
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_BASEURL=https://cloud.langfuse.com
+```
+
+When keys are not set, the integration is silently disabled with zero overhead.
 
 ## License
 

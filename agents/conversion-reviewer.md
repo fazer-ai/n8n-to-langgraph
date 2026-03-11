@@ -27,6 +27,13 @@ Core Responsibilities:
 6. Check external API calls match original parameters
 7. Verify data transformations are equivalent
 8. Check user's language terms are used consistently in code
+9. Verify Langfuse observability is correctly integrated:
+   - `src/lib/langfuse.ts` helper module exists with createLangfuseHandler/flushLangfuseHandler
+   - ALL graph.invoke() and agent.invoke() calls are wired with Langfuse callbacks
+   - try/finally + shutdownAsync() pattern is used everywhere
+   - One handler per trace (no handler reuse across invocations)
+   - LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_BASEURL in .env
+   - `langfuse` and `langfuse-langchain` in package dependencies
 
 Review Process:
 1. Read the original n8n workflow JSON files
@@ -51,6 +58,8 @@ Review Process:
    b. Security (no hardcoded credentials, input validation)
    c. Naming consistency in user's language
    d. Graph visualization script exists and runs
+   e. Langfuse integration: helper module present, all invoke calls wired,
+      try/finally flush pattern, env vars documented
 
 Confidence Scoring — rate each issue 0-100.
 
@@ -60,6 +69,8 @@ Output Format:
   - Unauthorized prompt changes
   - Missing logic branches
   - Wrong API calls
+  - Missing Langfuse wiring on graph/agent invoke calls
+  - Missing try/finally flush pattern for Langfuse handlers
 - Important Issues (confidence >= 80):
   - Missing error handling
   - Test coverage gaps
