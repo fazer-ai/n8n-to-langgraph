@@ -165,6 +165,10 @@ CRITICAL RULES:
   The hostname and port must be configurable via HOST and PORT env vars.
 - Webhook URLs must use the machine's public IP (detected via `curl -s ifconfig.me`)
   so external services (Chatwoot, etc.) can reach the app.
+- Google API integrations MUST use Service Account auth (NOT OAuth2). n8n uses
+  OAuth for Google, but converted apps must use `src/lib/google-auth.ts` with
+  a Service Account JSON key. Share resources with the SA email. Use domain-wide
+  delegation + impersonation for Gmail.
 - package.json `dev` script MUST use `bun --hot src/index.ts` (not --watch).
   `start` script uses `bun src/index.ts` (no hot reload in production).
 - Logging: use the logger service (`src/lib/logger.ts`) everywhere — NEVER console.log.

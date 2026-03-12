@@ -25,6 +25,7 @@ argument-hint: "<workflows-dir> [review]"
 | Execution data | State schema (Annotation) |
 | Wait node | sleep() in graph node |
 | Error trigger | try/catch + conditional edge |
+| Google OAuth credentials | Google Service Account (JSON key file) |
 | — (no n8n equivalent) | Langfuse observability (CallbackHandler) |
 | — (no n8n equivalent) | Logger service (structured logging) |
 
@@ -36,6 +37,69 @@ Where to find prompts in n8n JSON:
 - `parameters.messages` — Chat model message array
 - AI Agent tool descriptions — in connected tool nodes' `parameters.description`
 - Code nodes may contain prompt templates as string literals
+
+### Google APIs — Service Account (NOT OAuth)
+
+All Google integrations (Calendar, Sheets, Drive, Gmail, etc.) MUST use
+**Service Account** authentication, NEVER OAuth2 user-consent flow.
+
+n8n workflows often use OAuth credentials for Google services, but converted
+apps must replace these with Service Account credentials for server-to-server
+authentication (no browser, no user consent, no token refresh dance).
+
+**Setup**:
+1. Create a Service Account in Google Cloud Console
+2. Download the JSON key file
+3. Share the target resources (calendars, spreadsheets, etc.) with the
+   Service Account email (`xxx@project.iam.gserviceaccount.com`)
+4. For Gmail: enable domain-wide delegation and impersonate the target user
+
+**Environment variables** (add to .env):
+```env
+GOOGLE_SERVICE_ACCOUNT_KEY_PATH=./google-service-account.json
+# Or inline as base64:
+GOOGLE_SERVICE_ACCOUNT_KEY_BASE64=eyJ0eXBlIjoi...
+# For Gmail domain-wide delegation:
+GOOGLE_IMPERSONATE_EMAIL=user@domain.com
+```
+
+**Auth helper module** — create `src/lib/google-auth.ts`:
+
+```typescript
+import { google } from "googleapis";
+
+export function getGoogleAuth(scopes: string[], impersonateEmail?: string) {
+  const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+  const keyBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64;
+
+  let credentials: object;
+  if (keyPath) {
+    credentials = JSON.parse(Bun.file(keyPath).text());
+  } else if (keyBase64) {
+    credentials = JSON.parse(Buffer.from(keyBase64, "base64").toString());
+  } else {
+    throw new Error("Google Service Account credentials not configured");
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes,
+    clientOptions: impersonateEmail
+      ? { subject: impersonateEmail }
+      : undefined,
+  });
+
+  return auth;
+}
+```
+
+**Usage**:
+```typescript
+const auth = getGoogleAuth(["https://www.googleapis.com/auth/calendar.readonly"]);
+const calendar = google.calendar({ version: "v3", auth });
+```
+
+**Package**: `googleapis` (add via `bun add googleapis`)
 
 ### State Management
 
@@ -340,6 +404,8 @@ Run after implementation to verify graph topology visually.
    automatically instead of asking the user to do it manually
 10. **Missing logging** — Every graph node, tool, API call, webhook handler,
     and error path MUST have logging. Use the logger service, not console.log
+11. **Google OAuth** — NEVER use OAuth2 for Google APIs. Always use Service Account
+    credentials. n8n uses OAuth but converted apps must use Service Account.
 
 ---
 
