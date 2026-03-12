@@ -26,6 +26,7 @@ argument-hint: "<workflows-dir> [review]"
 | Wait node | sleep() in graph node |
 | Error trigger | try/catch + conditional edge |
 | — (no n8n equivalent) | Langfuse observability (CallbackHandler) |
+| — (no n8n equivalent) | Logger service (structured logging) |
 
 ### Prompt Extraction
 
@@ -47,6 +48,41 @@ Key differences:
 - Map n8n execution data → LangGraph state schema (Annotation.Root)
 - Map n8n static data → LangGraph Store or database
 
+### HTTP Server Binding
+
+Generated apps MUST bind to `0.0.0.0` (all interfaces), NOT `localhost` or
+`127.0.0.1`. This ensures the server is reachable from external services
+(e.g., Chatwoot webhooks).
+
+```typescript
+// ElysiaJS
+app.listen({ hostname: "0.0.0.0", port: Number(process.env.PORT ?? 3000) });
+
+// Express
+app.listen(Number(process.env.PORT ?? 3000), "0.0.0.0");
+
+// Bun.serve
+Bun.serve({ hostname: "0.0.0.0", port: Number(process.env.PORT ?? 3000), fetch: handler });
+```
+
+### package.json Scripts
+
+The generated `package.json` MUST include a `dev` script using Bun's `--hot` flag
+for hot reloading (preserves state, faster than `--watch`):
+
+```json
+{
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun src/index.ts"
+  }
+}
+```
+
+`--hot` reloads modules in-place without restarting the process, keeping
+HTTP connections and in-memory state alive. Use `--watch` only if `--hot`
+causes issues with a specific library.
+
 ### Tool Factory Pattern
 
 When tools need webhook/request context (e.g., conversation ID, phone number),
@@ -61,6 +97,92 @@ function createTools(context: { telefone: string; conversationId: number }) {
   ];
 }
 ```
+
+### Logger Service (Default)
+
+All converted LangGraph applications MUST include a centralized logger service
+for structured, leveled logging. Use **pino** as the logging library.
+
+**Package**: `pino` + `pino-pretty` (dev dependency)
+
+**Helper module** — create `src/lib/logger.ts`:
+
+```typescript
+import pino from "pino";
+
+export const logger = pino({
+  level: process.env.LOG_LEVEL ?? "info",
+  transport:
+    process.env.NODE_ENV !== "production"
+      ? { target: "pino-pretty", options: { colorize: true } }
+      : undefined,
+});
+
+export function createChildLogger(context: Record<string, unknown>) {
+  return logger.child(context);
+}
+```
+
+Design principles:
+- **Leveled**: `trace`, `debug`, `info`, `warn`, `error`, `fatal` — configurable via LOG_LEVEL env var
+- **Structured**: all log entries are JSON in production, pretty-printed in dev
+- **Child loggers**: use `createChildLogger` to add context (request ID, conversation ID, etc.)
+- **Zero-cost in prod**: pino is fast and low-overhead by design
+
+**Where to log** (be generous — logs are cheap, debugging without them is expensive):
+
+| Location | What to log | Level |
+|---|---|---|
+| Server startup | Host, port, public IP, environment | `info` |
+| Webhook received | Route, method, conversation ID, payload size | `info` |
+| Graph invocation start | Graph name, thread ID, input summary | `info` |
+| Graph invocation end | Graph name, thread ID, duration, output summary | `info` |
+| Node entry/exit | Node name, state snapshot (key fields) | `debug` |
+| Tool execution | Tool name, input params, output summary, duration | `debug` |
+| LLM call | Model, token count, latency (via Langfuse, but also log) | `debug` |
+| Conditional routing | Decision made, which branch taken, why | `debug` |
+| External API call | Service, method, URL, status code, duration | `info` |
+| External API error | Service, method, URL, status code, error body | `error` |
+| State update | Key fields changed, new values (redact sensitive data) | `debug` |
+| Error caught | Error message, stack trace, context | `error` |
+| Webhook response sent | Status code, duration from receipt | `info` |
+| Langfuse flush | Success/failure of handler shutdown | `debug` |
+| Credential validation | Service name, success/failure (never log secrets) | `info` |
+
+**Usage patterns**:
+
+```typescript
+import { logger, createChildLogger } from "./lib/logger";
+
+// At server startup
+logger.info({ host: "0.0.0.0", port: 3000, publicIp }, "Server started");
+
+// In webhook handler — create child logger with request context
+const log = createChildLogger({ route: "/webhook/chatwoot", conversationId });
+log.info({ payloadSize: body.length }, "Webhook received");
+
+// In graph node
+log.debug({ node: "classify_intent", threadId }, "Entering node");
+// ... node logic ...
+log.debug({ node: "classify_intent", result: intent }, "Exiting node");
+
+// In tool execution
+log.debug({ tool: "buscar_agenda", input: { date } }, "Tool called");
+const result = await fetchCalendar(date);
+log.debug({ tool: "buscar_agenda", slots: result.length }, "Tool completed");
+
+// Error handling
+try {
+  await chatwootApi.sendMessage(conversationId, text);
+  log.info({ service: "chatwoot", conversationId }, "Message sent");
+} catch (err) {
+  log.error({ service: "chatwoot", conversationId, err }, "Failed to send message");
+  throw err;
+}
+```
+
+**CRITICAL**: Never log secrets, API keys, tokens, or full request bodies containing
+sensitive user data. Redact or omit sensitive fields.
 
 ### Langfuse Observability (Default)
 
@@ -158,6 +280,32 @@ No changes needed in tools or prompts.
 
 ### Testing Strategy
 
+Use **Bun's native test runner** (`bun test`) — NEVER install vitest, jest, mocha,
+or any external test framework. Bun has built-in `describe`, `it`, `expect`, `mock`,
+`spyOn`, `beforeEach`, `afterEach`, and lifecycle hooks.
+
+```typescript
+import { describe, it, expect, mock, spyOn, beforeEach } from "bun:test";
+
+describe("myTool", () => {
+  it("should return expected result", async () => {
+    const mockFetch = mock(() =>
+      Promise.resolve(new Response(JSON.stringify({ ok: true })))
+    );
+    // ... test logic
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+Key Bun test features to use:
+- `mock()` for creating mock functions (replaces `vi.fn()` / `jest.fn()`)
+- `spyOn(object, method)` for spying on existing methods
+- `mock.module("module-name", () => ...)` for module mocking
+- Test files: `*.test.ts` naming convention
+- Run with: `bun test` (auto-discovers test files)
+- Run specific: `bun test src/tools/my-tool.test.ts`
+
 Tests after each implementation milestone (not TDD):
 1. **Foundation** (env, DB): validate config loading, connection setup
 2. **Services** (API clients): mock HTTP, verify request shapes
@@ -185,6 +333,13 @@ Run after implementation to verify graph topology visually.
 4. **Credential gaps** — List ALL env vars needed before implementing
 5. **Package.json edits** — NEVER edit manually; always `bun add <pkg>`
 6. **Language mismatch** — Use user's language in code naming, not English
+7. **Localhost binding** — Server MUST bind to `0.0.0.0`, never localhost/127.0.0.1
+8. **Webhook URLs with localhost** — Always detect public IP (`curl -s ifconfig.me`)
+   and use it for webhook URLs so external services can reach the app
+9. **Manual webhook setup** — Use MCP Chatwoot tools to register webhooks
+   automatically instead of asking the user to do it manually
+10. **Missing logging** — Every graph node, tool, API call, webhook handler,
+    and error path MUST have logging. Use the logger service, not console.log
 
 ---
 
@@ -216,6 +371,20 @@ Otherwise, run the Analysis + Planning pipeline:
    - Do not proceed until user confirms credentials are set up
    - If user wants to skip, acknowledge that manual testing won't be
      possible until credentials are configured later
+6. **PUBLIC IP DETECTION & WEBHOOK SETUP**:
+   - Detect the machine's public IP by running: `curl -s ifconfig.me`
+   - Store the public IP for use in webhook URLs
+   - Determine the app's PORT from .env (default 3000)
+   - Build the webhook base URL: `http://<PUBLIC_IP>:<PORT>`
+   - If Chatwoot is among the detected integrations, use MCP Chatwoot
+     tools to configure the webhook:
+     a. Use `mcp_chatwoot_list_inboxes` to find the target inbox
+     b. Use `mcp_chatwoot_update_inbox` (or the appropriate MCP tool)
+        to set the webhook URL to `http://<PUBLIC_IP>:<PORT>/webhook/chatwoot`
+     c. Verify the webhook was registered by listing inbox details
+   - If other services need webhook registration, document the URL
+     for the user to configure manually
+   - Save PUBLIC_IP and WEBHOOK_BASE_URL to .env for reference
 
 ### PHASE 2: ARCHITECTURE & PLANNING
 
@@ -223,6 +392,8 @@ Otherwise, run the Analysis + Planning pipeline:
    - Full consolidated analysis from Phase 1
    - List of credentials available in .env
    - User's language preference
+   - Instruction to include Logger service module (`src/lib/logger.ts`) with
+     structured logging throughout all layers (routes, nodes, tools, services)
    - Instruction to include Langfuse observability module (`src/lib/langfuse.ts`)
      and wire it into all graph/agent `.invoke()` calls
    - List of detected integrations (e.g. Chatwoot, Google Calendar, etc.)
@@ -231,10 +402,11 @@ Otherwise, run the Analysis + Planning pipeline:
 2. Architect produces the conversion plan including:
    - Architecture overview
    - State schemas, node/edge definitions, tool specs
+   - Logger service spec (`src/lib/logger.ts`) and logging placement guide
    - Langfuse helper module spec (`src/lib/langfuse.ts`) and wiring into all invoke calls
    - System prompts: ORIGINAL + PROPOSED ADAPTATION + DIFF
    - Package list (exact names for `bun add` — NEVER manual package.json)
-     — must include `langfuse` and `langfuse-langchain`
+     — must include `langfuse`, `langfuse-langchain`, `pino`, and `pino-pretty` (dev)
    - Milestone-based test plan
    - Implementation order as phased checklist
    - Graph visualization script spec (visualize-graphs.ts)

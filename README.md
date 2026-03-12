@@ -104,6 +104,7 @@ Launches parallel reviewers that compare the implementation against the original
 | Credentials | Environment variables (.env) |
 | Execution data | State schema (Annotation) |
 | — (no n8n equivalent) | Langfuse observability (CallbackHandler) |
+| — (no n8n equivalent) | Logger service (pino structured logging) |
 
 ## Dependencies
 
@@ -126,6 +127,10 @@ LANGFUSE_BASEURL=https://cloud.langfuse.com
 ```
 
 When keys are not set, the integration is silently disabled with zero overhead.
+
+### Logger Service
+
+Converted applications include a centralized logger service (`src/lib/logger.ts`) built on [pino](https://github.com/pinojs/pino) with structured, leveled logging throughout all layers — webhook handlers, graph nodes, tools, API calls, and error paths. Log level is configurable via `LOG_LEVEL` env var (default: `info`). Pretty-printed in development, JSON in production.
 
 ## License
 

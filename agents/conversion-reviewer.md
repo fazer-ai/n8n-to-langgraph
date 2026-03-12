@@ -27,7 +27,14 @@ Core Responsibilities:
 6. Check external API calls match original parameters
 7. Verify data transformations are equivalent
 8. Check user's language terms are used consistently in code
-9. Verify Langfuse observability is correctly integrated:
+9. Verify Logger service is correctly integrated:
+   - `src/lib/logger.ts` exists with pino, leveled logging, child logger factory
+   - Logger is imported and used in ALL route handlers, graph nodes, tools, and services
+   - Child loggers are created with relevant context (conversationId, threadId, etc.)
+   - No usage of console.log/warn/error anywhere in the codebase
+   - LOG_LEVEL env var documented in .env
+   - Sensitive data (API keys, tokens, passwords) is never logged
+10. Verify Langfuse observability is correctly integrated:
    - `src/lib/langfuse.ts` helper module exists with createLangfuseHandler/flushLangfuseHandler
    - ALL graph.invoke() and agent.invoke() calls are wired with Langfuse callbacks
    - try/finally + shutdownAsync() pattern is used everywhere
@@ -53,6 +60,8 @@ Review Process:
    b. Is every graph routing path tested?
    c. Are edge cases covered?
    d. Are there manual test scripts for real API calls?
+   e. Do all tests import from `bun:test` (not vitest, jest, or other runners)?
+   f. Are `mock()` and `spyOn()` from `bun:test` used for mocking (no external libs)?
 6. Review code quality:
    a. LangGraph best practices (state schema, node purity)
    b. Security (no hardcoded credentials, input validation)
@@ -60,6 +69,20 @@ Review Process:
    d. Graph visualization script exists and runs
    e. Langfuse integration: helper module present, all invoke calls wired,
       try/finally flush pattern, env vars documented
+   f. Logger service: `src/lib/logger.ts` exists, pino configured, child loggers
+      used with context — verify logging is present at:
+      - Server startup (host, port, public IP)
+      - Every webhook handler (request received, response sent)
+      - Every graph invocation (start, end, duration)
+      - Every graph node (entry, exit, key state)
+      - Every tool execution (input, output, duration)
+      - Every external API call (service, method, status, duration)
+      - Every error catch block (error message, stack, context)
+      - Flag any use of console.log/warn/error — must use logger instead
+   g. Tests use Bun's native test runner (`bun:test`) — flag any vitest/jest imports
+   h. HTTP server binds to `0.0.0.0` (not localhost/127.0.0.1)
+   i. Webhook URLs use public IP, not localhost — verify Chatwoot webhook
+      was configured via MCP Chatwoot tools during setup
 
 Confidence Scoring — rate each issue 0-100.
 
@@ -71,6 +94,11 @@ Output Format:
   - Wrong API calls
   - Missing Langfuse wiring on graph/agent invoke calls
   - Missing try/finally flush pattern for Langfuse handlers
+  - Tests importing from vitest/jest instead of `bun:test`
+  - Server binding to localhost instead of 0.0.0.0
+  - Webhook URLs using localhost instead of public IP
+  - Missing logger service (`src/lib/logger.ts`) or use of console.log
+  - Graph nodes, tools, or webhook handlers without any logging
 - Important Issues (confidence >= 80):
   - Missing error handling
   - Test coverage gaps
