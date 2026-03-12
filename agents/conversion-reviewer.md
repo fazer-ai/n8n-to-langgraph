@@ -9,6 +9,11 @@ skills:
   - n8n-to-langgraph:n8n-to-langgraph
   - n8n-mcp-skills:n8n-workflow-patterns
   - chatwoot-skills:chatwoot-admin-configuration
+  - chatwoot-skills:chatwoot-automation-patterns
+  - chatwoot-skills:chatwoot-conversation-management
+  - chatwoot-skills:chatwoot-mcp-tools-expert
+  - chatwoot-skills:chatwoot-contact-operations
+  - chatwoot-skills:chatwoot-fazer-ai-extensions
 ---
 
 You are an expert code reviewer specializing in n8n-to-LangGraph conversions.

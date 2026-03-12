@@ -530,7 +530,15 @@ When the user is satisfied with the plan, instruct them to run
 ```
 /ralph-loop:ralph-loop "Leia e siga o plano de conversão em
 <PLAN_FILE_PATH>. Siga as diretrizes de implementação na
-seção final do plano." --max-iterations 15 --completion-promise
+seção final do plano.
+
+Após cada milestone concluído, execute a skill de review para validar
+o trabalho feito até o momento:
+/n8n-to-langgraph <WORKFLOWS_DIR> review
+
+Analise o relatório de review e corrija os problemas críticos
+(confidence >= 90%) antes de avançar para o próximo milestone."
+--max-iterations 15 --completion-promise
 'Todos os workflows convertidos, testes passando, verificação manual completa'
 ```
 
@@ -538,6 +546,10 @@ The implementation guidelines are embedded in the plan itself (written
 by the conversion-architect), so the ralph-loop prompt only needs to
 reference the plan file path. All rules — bun add, user's language,
 skill invocation, testing, commits, etc. — live in the plan.
+
+The review step (`/n8n-to-langgraph <WORKFLOWS_DIR> review`) launches
+the `conversion-reviewer` agents after each milestone, catching fidelity
+and quality issues early instead of only at the end.
 
 ---
 
