@@ -371,20 +371,64 @@ Otherwise, run the Analysis + Planning pipeline:
    - Do not proceed until user confirms credentials are set up
    - If user wants to skip, acknowledge that manual testing won't be
      possible until credentials are configured later
-6. **PUBLIC IP DETECTION & WEBHOOK SETUP**:
+6. **PUBLIC IP DETECTION**:
    - Detect the machine's public IP by running: `curl -s ifconfig.me`
    - Store the public IP for use in webhook URLs
    - Determine the app's PORT from .env (default 3000)
    - Build the webhook base URL: `http://<PUBLIC_IP>:<PORT>`
-   - If Chatwoot is among the detected integrations, use MCP Chatwoot
-     tools to configure the webhook:
-     a. Use `mcp_chatwoot_list_inboxes` to find the target inbox
-     b. Use `mcp_chatwoot_update_inbox` (or the appropriate MCP tool)
-        to set the webhook URL to `http://<PUBLIC_IP>:<PORT>/webhook/chatwoot`
-     c. Verify the webhook was registered by listing inbox details
-   - If other services need webhook registration, document the URL
-     for the user to configure manually
    - Save PUBLIC_IP and WEBHOOK_BASE_URL to .env for reference
+7. **CHATWOOT WEBHOOK SETUP (interactive, using MCP Chatwoot tools)**:
+   If Chatwoot is among the detected integrations, invoke the
+   `chatwoot-skills:chatwoot-admin-configuration` skill for guidance
+   and use MCP Chatwoot tools to configure webhooks interactively
+   with the user:
+
+   a. **Determine webhook strategy** — ask the user which approach fits:
+      - **Account-level webhook** (receives events for ALL conversations):
+        ```
+        webhooks_create(
+          account_id: <ID>,
+          url: "http://<PUBLIC_IP>:<PORT>/webhook/chatwoot",
+          subscriptions: ["message_created", "message_updated",
+            "conversation_created", "conversation_status_changed"]
+        )
+        ```
+      - **API inbox with webhook_url** (receives only that inbox's messages):
+        ```
+        inboxes_create(
+          account_id: <ID>,
+          name: "<inbox name>",
+          channel: { type: "api", webhook_url: "http://<PUBLIC_IP>:<PORT>/webhook/chatwoot" }
+        )
+        ```
+      - **Agent bot with outgoing_url** (bot receives conversation events):
+        ```
+        agent_bots_create(
+          name: "<bot name>",
+          outgoing_url: "http://<PUBLIC_IP>:<PORT>/webhook/chatwoot"
+        )
+        ```
+        Then attach to inbox: `inboxes_set_agent_bot(account_id, inbox_id, agent_bot_id)`
+
+   b. **Execute the chosen setup** using the MCP Chatwoot tools:
+      - For account webhook: call `webhooks_create` with the public IP URL
+        and the event subscriptions needed by the converted workflows
+      - For API inbox: call `inboxes_create` with channel type "api"
+      - For bot: call `agent_bots_create` then `inboxes_set_agent_bot`
+
+   c. **Verify the configuration**:
+      - List webhooks or inbox details to confirm the URL was registered
+      - Show the user the configured webhook URL and subscribed events
+      - Suggest a quick test: send a test message in Chatwoot and check
+        that the app receives it (once the server is running)
+
+   d. **Document the setup** in the project README or .env:
+      - Which webhook strategy was chosen
+      - The webhook URL and subscribed events
+      - How to reconfigure if the public IP changes
+
+   If other services need webhook registration, document the URL
+   for the user to configure manually.
 
 ### PHASE 2: ARCHITECTURE & PLANNING
 

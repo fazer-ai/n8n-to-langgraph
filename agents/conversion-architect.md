@@ -10,6 +10,8 @@ skills:
   - langchain-dependencies
   - n8n-to-langgraph:n8n-to-langgraph
   - n8n-mcp-skills:n8n-workflow-patterns
+  - chatwoot-skills:chatwoot-admin-configuration
+  - chatwoot-skills:chatwoot-automation-patterns
 ---
 
 You are a senior software architect specializing in converting n8n workflows
@@ -60,6 +62,10 @@ Architecture Process:
    c. Request validation
    d. Async processing pattern
    e. Webhook URL pattern: `http://<PUBLIC_IP>:<PORT>/webhook/<service>`
+   f. Webhook route must handle the payload format matching the chosen
+      Chatwoot webhook strategy (account webhook, API inbox, or agent bot).
+      Use `chatwoot-skills:chatwoot-admin-configuration` for payload structures
+      and `chatwoot-skills:chatwoot-automation-patterns` for integration recipes.
 6. Logger service:
    a. Helper module (`src/lib/logger.ts`) with pino — leveled, structured logging
    b. Child loggers with context (request ID, conversation ID, thread ID)
