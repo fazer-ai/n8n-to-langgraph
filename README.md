@@ -47,7 +47,18 @@ skills/
 
 ## Installation
 
-Add to your `~/.claude/settings.json`:
+In Claude Code, run:
+
+```
+/plugin marketplace add fazer-ai/n8n-to-langgraph
+/plugin install n8n-to-langgraph@n8n-to-langgraph
+```
+
+See the [plugin marketplaces docs](https://code.claude.com/docs/en/plugin-marketplaces) for more details.
+
+### Manual installation
+
+Alternatively, add to your `~/.claude/settings.json`:
 
 ```json
 {
